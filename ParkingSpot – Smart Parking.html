@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ParkingSpot – Smart Parking</title>
+<style>
+:root{--bg:#f5f7fb;--card:#fff;--tx:#14213d;--mut:#64748b;--pri:#2563eb;--ok:#16a34a;--bad:#dc2626;--warn:#d97706;--bd:#e2e8f0;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f172a;--card:#1e293b;--tx:#f1f5f9;--mut:#94a3b8;--pri:#60a5fa;--bd:#334155}}
+:root[data-theme="dark"]{--bg:#0f172a;--card:#1e293b;--tx:#f1f5f9;--mut:#94a3b8;--pri:#60a5fa;--bd:#334155}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.5}
+header{background:var(--pri);color:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+header h1{margin:0;font-size:1.3rem}
+nav button{background:transparent;color:#fff;border:1px solid #fff8;padding:6px 14px;border-radius:20px;cursor:pointer;margin-left:6px;font-size:.9rem}
+nav button.on{background:#fff;color:#1d4ed8}
+main{max-width:980px;margin:0 auto;padding:20px}
+.hero{text-align:center;padding:10px 0 18px}.hero h2{margin:0 0 4px;font-size:1.6rem}.hero p{margin:0;color:var(--mut)}
+input,select,button{font:inherit}
+.bar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.bar input,.bar select{flex:1;min-width:150px;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--card);color:var(--tx)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px}
+.card h3{margin:0 0 2px;font-size:1.05rem}.mut{color:var(--mut);font-size:.88rem}
+.row{display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:8px}
+.badge{padding:2px 10px;border-radius:12px;font-size:.78rem;font-weight:600;color:#fff}
+.meter{height:8px;background:var(--bd);border-radius:6px;overflow:hidden;margin-top:10px}.meter i{display:block;height:100%}
+.btn{background:var(--pri);color:#fff;border:0;padding:8px 16px;border-radius:8px;cursor:pointer;font-weight:600}
+.btn:disabled{opacity:.5;cursor:not-allowed}.btn.sec{background:transparent;color:var(--bad);border:1px solid var(--bad)}
+.modal{position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;padding:16px;z-index:9}
+.modal.open{display:flex}.box{background:var(--card);border-radius:14px;padding:20px;max-width:460px;width:100%;max-height:92vh;overflow:auto}
+.slots{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin:10px 0}
+.slot{padding:8px 0;text-align:center;border-radius:6px;font-size:.8rem;border:1px solid var(--bd);cursor:pointer;background:var(--card);color:var(--tx)}
+.slot.x{background:var(--bad);color:#fff;border-color:var(--bad);cursor:not-allowed;opacity:.7}.slot.sel{background:var(--pri);color:#fff;border-color:var(--pri)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.stats b{display:block;font-size:1.5rem}
+.tbl{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:.92rem}th,td{text-align:left;padding:8px;border-bottom:1px solid var(--bd)}
+label{display:block;margin-top:10px;font-size:.88rem;color:var(--mut)}
+label input,label select{width:100%;padding:9px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx)}
+.hide{display:none}footer{text-align:center;color:var(--mut);font-size:.8rem;padding:24px}
+</style>
+</head>
+<body>
+<header>
+  <h1>🅿️ ParkingSpot</h1>
+  <nav>
+    <button data-v="find" class="on">Find Parking</button>
+    <button data-v="mine">My Bookings</button>
+    <button data-v="op">Operator</button>
+  </nav>
+</header>
+<main>
+  <section id="find">
+    <div class="hero"><h2>Find and reserve a spot in seconds</h2><p>Real-time availability, instant booking, secure payment.</p></div>
+    <div class="bar">
+      <input id="q" placeholder="Search by name or area…">
+      <select id="sort"><option value="near">Nearest</option><option value="price">Cheapest</option><option value="free">Most available</option></select>
+    </div>
+    <div class="grid" id="lots"></div>
+  </section>
+  <section id="mine" class="hide"><h2>My Bookings</h2><div id="bk"></div></section>
+  <section id="op" class="hide">
+    <h2>Operator Dashboard</h2>
+    <div class="stats" id="stats"></div>
+    <div class="card tbl"><table><thead><tr><th>Lot</th><th>Occupied</th><th>Rate</th><th>Utilisation</th></tr></thead><tbody id="ot"></tbody></table></div>
+  </section>
+</main>
+<footer>ParkingSpot demo · Payments are simulated</footer>
+
+<div class="modal" id="m"><div class="box" id="mb"></div></div>
+
+<script>
+const LOTS=[
+ {id:1,name:"Central Mall Parking",area:"T. Nagar",dist:0.4,price:40,total:36,amen:"CCTV · EV charging"},
+ {id:2,name:"Marina Beach Lot",area:"Marina",dist:2.1,price:30,total:30,amen:"Open air · Guard"},
+ {id:3,name:"Metro Station Garage",area:"Guindy",dist:1.2,price:25,total:42,amen:"Covered · CCTV"},
+ {id:4,name:"Tech Park Basement",area:"OMR",dist:5.6,price:50,total:48,amen:"Covered · EV charging"},
+ {id:5,name:"City Hospital Parking",area:"Egmore",dist:3.3,price:20,total:24,amen:"24/7 · Guard"},
+ {id:6,name:"Airport Multi-level",area:"Meenambakkam",dist:7.8,price:60,total:60,amen:"Covered · Valet"}
+];
+// deterministic pseudo-random occupied slots
+LOTS.forEach(l=>{l.occ=new Set();let s=l.id*7919;for(let i=1;i<=l.total;i++){s=(s*1103515245+12345)&0x7fffffff;if(s%100<55)l.occ.add(i)}});
+const $=s=>document.querySelector(s);
+let books=[];try{books=JSON.parse(localStorage.getItem("ps_books")||"[]")}catch(e){}
+const save=()=>{try{localStorage.setItem("ps_books",JSON.stringify(books))}catch(e){}};
+const free=l=>l.total-l.occ.size;
+const col=l=>{const p=l.occ.size/l.total;return p>.85?"var(--bad)":p>.6?"var(--warn)":"var(--ok)"};
+
+function show(v){["find","mine","op"].forEach(x=>$("#"+x).classList.toggle("hide",x!==v));
+ document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
+ if(v==="mine")renderBk();if(v==="op")renderOp();if(v==="find")renderLots()}
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>show(b.dataset.v));
+
+function renderLots(){
+ const q=$("#q").value.toLowerCase(),s=$("#sort").value;
+ let a=LOTS.filter(l=>(l.name+l.area).toLowerCase().includes(q));
+ a.sort((x,y)=>s==="price"?x.price-y.price:s==="free"?free(y)-free(x):x.dist-y.dist);
+ $("#lots").innerHTML=a.map(l=>`<div class="card"><h3>${l.name}</h3><div class="mut">${l.area} · ${l.dist} km · ${l.amen}</div>
+ <div class="meter"><i style="width:${l.occ.size/l.total*100}%;background:${col(l)}"></i></div>
+ <div class="row"><span><b>${free(l)}</b> of ${l.total} free</span><span class="badge" style="background:${col(l)}">₹${l.price}/hr</span></div>
+ <div class="row"><span></span><button class="btn" ${free(l)?"":"disabled"} onclick="openBook(${l.id})">${free(l)?"Reserve":"Full"}</button></div></div>`).join("")||'<p class="mut">No parking found.</p>';
+}
+$("#q").oninput=renderLots;$("#sort").onchange=renderLots;
+
+let sel=null,cur=null;
+function openBook(id){cur=LOTS.find(l=>l.id===id);sel=null;
+ $("#mb").innerHTML=`<h3 style="margin-top:0">${cur.name}</h3><div class="mut">Pick a slot (red = taken)</div>
+ <div class="slots">${Array.from({length:cur.total},(_,i)=>i+1).map(n=>`<div class="slot ${cur.occ.has(n)?"x":""}" data-n="${n}">${n}</div>`).join("")}</div>
+ <label>Vehicle number<input id="veh" placeholder="TN 09 AB 1234"></label>
+ <label>Duration<select id="hrs">${[1,2,3,4,6,8].map(h=>`<option>${h}</option>`).join("")}</select></label>
+ <label>Payment method<select id="pay"><option>UPI</option><option>Credit / Debit card</option><option>Net banking</option></select></label>
+ <div class="row"><b id="tot"></b><span><button class="btn sec" onclick="closeM()">Cancel</button> <button class="btn" onclick="confirmBook()">Pay &amp; Book</button></span></div>`;
+ document.querySelectorAll(".slot:not(.x)").forEach(e=>e.onclick=()=>{document.querySelectorAll(".slot").forEach(x=>x.classList.remove("sel"));e.classList.add("sel");sel=+e.dataset.n});
+ $("#hrs").onchange=tot;tot();$("#m").classList.add("open")}
+const tot=()=>$("#tot").textContent="Total: ₹"+cur.price*$("#hrs").value;
+const closeM=()=>$("#m").classList.remove("open");
+$("#m").onclick=e=>{if(e.target.id==="m")closeM()};
+
+function confirmBook(){
+ const v=$("#veh").value.trim();
+ if(!sel)return alert("Please choose a slot.");
+ if(v.length<4)return alert("Enter a valid vehicle number.");
+ const h=+$("#hrs").value;
+ cur.occ.add(sel);
+ books.unshift({ref:"PS"+Date.now().toString().slice(-6),lot:cur.name,lotId:cur.id,slot:sel,veh:v.toUpperCase(),hrs:h,amt:cur.price*h,pay:$("#pay").value,at:new Date().toLocaleString()});
+ save();closeM();alert("Payment successful! Booking "+books[0].ref+" confirmed.");show("mine")}
+
+function renderBk(){
+ $("#bk").innerHTML=books.length?books.map(b=>`<div class="card" style="margin-bottom:12px"><div class="row" style="margin:0"><h3>${b.lot}</h3><span class="badge" style="background:var(--ok)">Confirmed</span></div>
+ <div class="mut">Ref ${b.ref} · Slot ${b.slot} · ${b.veh}</div><div class="mut">${b.hrs} hr · ₹${b.amt} via ${b.pay} · ${b.at}</div>
+ <div class="row"><span></span><button class="btn sec" onclick="cancelBk('${b.ref}')">Cancel</button></div></div>`).join(""):'<p class="mut">No bookings yet. Reserve a spot from Find Parking.</p>'}
+function cancelBk(r){const b=books.find(x=>x.ref===r);if(!b||!confirm("Cancel this booking?"))return;
+ const l=LOTS.find(x=>x.id===b.lotId);if(l)l.occ.delete(b.slot);books=books.filter(x=>x.ref!==r);save();renderBk()}
+
+function renderOp(){
+ const occ=LOTS.reduce((a,l)=>a+l.occ.size,0),tt=LOTS.reduce((a,l)=>a+l.total,0),rev=books.reduce((a,b)=>a+b.amt,0);
+ $("#stats").innerHTML=[["Locations",LOTS.length],["Total slots",tt],["Occupied",occ],["Utilisation",Math.round(occ/tt*100)+"%"],["Revenue (your bookings)","₹"+rev]].map(s=>`<div class="card"><span class="mut">${s[0]}</span><b>${s[1]}</b></div>`).join("");
+ $("#ot").innerHTML=LOTS.map(l=>{const p=Math.round(l.occ.size/l.total*100);return`<tr><td>${l.name}</td><td>${l.occ.size}/${l.total}</td><td>₹${l.price}</td><td style="min-width:120px"><div class="meter" style="margin:0"><i style="width:${p}%;background:${col(l)}"></i></div>${p}%</td></tr>`}).join("")}
+
+// re-apply saved bookings to occupancy
+books.forEach(b=>{const l=LOTS.find(x=>x.id===b.lotId);if(l)l.occ.add(b.slot)});
+renderLots();
+</script>
+</body>
+</html>
